@@ -3,7 +3,7 @@ name: Tests for TPCH Queries
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, dev/test_ci]
 
 jobs:
   validate-queries:
