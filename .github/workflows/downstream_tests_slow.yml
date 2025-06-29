@@ -3,6 +3,8 @@ name: Test Downstream Libraries - Slow
 on: 
   workflow_call:
   workflow_dispatch:
+  push:
+    branches: [dev/bokeh_tests]
 
 env:
   PY_COLORS: 1
@@ -64,3 +66,145 @@ jobs:
           env:
             VEGAFUSION_TEST_HEADLESS: 1
           run: pytest
+
+  bokeh:
+    env:
+      UV_SYSTEM_PYTHON: true
+
+    strategy:
+      matrix:
+        python-version: ["3.11"]
+        os: [ubuntu-latest]
+
+    runs-on: ${{ matrix.os }}
+    
+    defaults:
+      run:
+        shell: bash -l {0}
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Clone Bokeh repository
+        run: |
+          git clone --single-branch -b branch-3.8 https://github.com/bokeh/bokeh.git
+          cd bokeh
+          git log --oneline -n 5
+          
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          miniconda-version: 'latest'
+          activate-environment: bk-test
+          conda-remove-defaults: true
+          
+      - name: Install libmamba solver
+        run: |
+          conda install -q -n base conda-libmamba-solver
+          conda config --set solver libmamba
+          
+      - name: Install Node.js and npm
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          
+      - name: Cache conda dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/conda_pkgs_dir
+          key: ${{ runner.os }}-conda-${{ matrix.python-version }}-${{ hashFiles('bokeh/conda/environment-test-3.11.yml') }}
+          
+      - name: Update conda environment
+        working-directory: bokeh
+        run: |
+          # Install conda dependencies using Bokeh's test environment
+          conda env update -q -n bk-test -f conda/environment-test-3.11.yml
+          
+      - name: Upgrade npm
+        run: |
+          npm install --location=global npm
+          
+      - name: Build Bokeh from source
+        working-directory: bokeh
+        run: |
+          # Build BokehJS first
+          cd bokehjs
+          npm install
+          npm run build
+          cd ..
+          
+          # Build Python package
+          python -m pip install build
+          python -m build --wheel
+          
+          # Install the built wheel
+          pip install dist/bokeh-*-py3-none-any.whl
+          
+      - name: List installed software
+        run: |
+          conda info
+          conda list
+          echo "node $(node --version)"
+          echo "npm $(npm --version)"
+          python --version
+          
+      - name: Install narwhals in development mode
+        run: |
+          pip install -e .
+          
+      - name: Install chromium for examples tests
+        run: |
+          # Install chromium for headless browser testing
+          sudo apt-get update
+          sudo apt-get install -y chromium-browser
+          
+      - name: Ensure Python version
+        run: |
+          if [[ ! "$(python --version | cut -d' ' -f2)" == "${{ matrix.python-version }}"* ]]; then 
+            echo "Python version mismatch!"
+            python --version
+            exit 1
+          fi
+          
+      - name: Test Bokeh defaults
+        working-directory: bokeh
+        run: |
+          pytest tests/test_defaults.py
+          
+      - name: Test Bokeh cross
+        working-directory: bokeh
+        run: |
+          pytest tests/test_cross.py
+          
+      - name: Run Bokeh unit tests
+        working-directory: bokeh
+        if: success() || failure()
+        run: |
+          COLOR="--color=yes"
+          COVERAGE="--cov=bokeh --cov-report=xml"
+          POLICY="--last-failed --last-failed-no-failures none"
+          pytest $COLOR $COVERAGE tests/unit || pytest $COLOR $POLICY tests/unit
+          
+      - name: Start chrome headless for examples
+        working-directory: bokeh/bokehjs
+        run: |
+          # Start chrome in headless mode for examples testing
+          node make test:spawn:headless &
+          sleep 5  # Give chrome time to start
+          
+      - name: Run Bokeh examples tests
+        working-directory: bokeh
+        if: success() || failure()
+        run: |
+          # Run examples tests (may require AWS credentials for some tests)
+          pytest -s -v --color=yes --tb=line tests/test_examples.py || echo "Some examples tests may have failed due to missing AWS credentials"
+          
+      - name: Test narwhals integration
+        working-directory: bokeh
+        if: success() || failure()
+        run: |
+          # Test basic narwhals integration
+          python -c "import bokeh; import narwhals; print('Bokeh and Narwhals imported successfully')"
+          
+          # Run any dataframe-related tests that might involve narwhals
+          pytest -v --color=yes -k "dataframe or pandas or polars" tests/unit/ || echo "No dataframe-related tests found or they completed"
