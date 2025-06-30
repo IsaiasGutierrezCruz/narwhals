@@ -26,8 +26,76 @@ jobs:
           cd bokeh
           git log --oneline -n 5
           
-      - name: Build Bokeh and BokehJS using composite action
-        uses: ./bokeh/.github/workflows/composite/build
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          miniconda-version: 'latest'
+          activate-environment: bk-test
+          conda-remove-defaults: true
+          
+      - name: Install libmamba solver
+        run: |
+          conda install -q -n base conda-libmamba-solver
+          conda config --set solver libmamba
+          
+      - name: Update bk-test environment
+        working-directory: bokeh
+        run: |
+          conda env update -q -n bk-test -f conda/environment-build.yml
+          
+      - name: Install node modules
+        working-directory: bokeh
+        run: |
+          bash scripts/ci/install_node_modules.sh
+          
+      - name: Build BokehJS
+        working-directory: bokeh/bokehjs
+        run: |
+          node make build
+          
+      - name: Build pip packages
+        working-directory: bokeh
+        env:
+          BOKEHJS_ACTION: 'install'
+        run: |
+          python -m build .
+          
+      - name: Verify pip install from sdist
+        working-directory: bokeh
+        run: |
+          bash scripts/ci/verify_pip_install_from_sdist.sh
+          
+      - name: Verify pip install using sdist
+        working-directory: bokeh
+        run: |
+          bash scripts/ci/verify_pip_install_using_sdist.sh
+          
+      - name: Verify pip install using wheel
+        working-directory: bokeh
+        run: |
+          bash scripts/ci/verify_pip_install_using_wheel.sh
+          
+      - name: Build conda package
+        working-directory: bokeh
+        run: |
+          bash scripts/ci/build_conda_package.sh
+          
+      - name: Verify conda install
+        working-directory: bokeh
+        run: |
+          bash scripts/ci/verify_conda_install.sh
+          
+      - name: Upload wheel package
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheel-package
+          path: bokeh/dist/bokeh-*-py3-none-any.whl
+          
+      - name: Upload bokehjs package
+        uses: actions/upload-artifact@v4
+        with:
+          name: bokehjs-package
+          path: bokeh/bokehjs/build/dist/bokeh-bokehjs-*.tgz
 
   bokeh:
     needs: build-bokeh
