@@ -88,7 +88,7 @@ jobs:
       - name: Upload wheel package
         uses: actions/upload-artifact@v4
         with:
-          name: wheel-package
+          name: bokeh-wheel-package
           path: bokeh/dist/bokeh-*-py3-none-any.whl
           
       - name: Upload bokehjs package
@@ -102,8 +102,11 @@ jobs:
     
     strategy:
       matrix:
-        python-version: ["3.11"]
+        python-version: ["3.10", "3.13"]
         os: [ubuntu-latest]
+    env:
+      OS: ${{ matrix.os }}
+      PYTHON: ${{ matrix.python-version }}
 
     runs-on: ${{ matrix.os }}
     
@@ -136,12 +139,12 @@ jobs:
         working-directory: bokeh
         run: |
           # Install conda dependencies using Bokeh's test environment
-          conda env update -q -n bk-test -f conda/environment-test-3.11.yml
+          conda env update -q -n bk-test -f conda/environment-test-${{ matrix.python-version }}.yml
           
       - name: Download wheel package
         uses: actions/download-artifact@v4
         with:
-          name: wheel-package
+          name: bokeh-wheel-package
           path: bokeh/dist/
           
       - name: Install wheel package
