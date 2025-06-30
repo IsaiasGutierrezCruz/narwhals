@@ -175,6 +175,7 @@ jobs:
         run: |
           pwd
           ls -la
+          pip freeze
           pip uninstall -y narwhals
           pip install -e .
           
