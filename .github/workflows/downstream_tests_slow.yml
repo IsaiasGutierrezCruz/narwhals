@@ -3,7 +3,8 @@ name: Test Downstream Libraries - Slow
 on: 
   workflow_call:
   workflow_dispatch:
-
+  push:
+    branches: [dev/bokeh_tests]
 env:
   PY_COLORS: 1
 
