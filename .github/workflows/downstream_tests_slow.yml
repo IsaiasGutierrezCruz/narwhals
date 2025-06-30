@@ -10,6 +10,8 @@ env:
   PY_COLORS: 1
 
 jobs:
+  # build bokeh process emulating the build process used in the main bokeh repo
+  # in order to tolerate possible updates in the .yaml files
   build-bokeh:
     runs-on: ubuntu-latest
     
@@ -102,7 +104,7 @@ jobs:
     
     strategy:
       matrix:
-        python-version: ["3.10", "3.13"]
+        python-version: ["3.12"]
         os: [ubuntu-latest]
     env:
       OS: ${{ matrix.os }}
@@ -161,10 +163,6 @@ jobs:
         working-directory: bokeh/bokehjs/build/dist/
         run: |
           ln -s $(ls -t bokeh-bokehjs-*.tgz | head -n 1) bokeh-bokehjs.tgz
-          
-      - name: Upgrade npm
-        run: |
-          npm install --location=global npm
           
       - name: List installed software
         run: |
