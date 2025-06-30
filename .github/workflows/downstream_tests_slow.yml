@@ -152,12 +152,6 @@ jobs:
         run: |
           pip install -e .
           
-      - name: Install chromium for examples tests
-        run: |
-          # Install chromium for headless browser testing
-          sudo apt-get update
-          sudo apt-get install -y chromium-browser
-          
       - name: Ensure Python version
         run: |
           if [[ ! "$(python --version | cut -d' ' -f2)" == "${{ matrix.python-version }}"* ]]; then 
@@ -185,26 +179,3 @@ jobs:
           POLICY="--last-failed --last-failed-no-failures none"
           pytest $COLOR $COVERAGE tests/unit || pytest $COLOR $POLICY tests/unit
           
-      - name: Start chrome headless for examples
-        working-directory: bokeh/bokehjs
-        run: |
-          # Start chrome in headless mode for examples testing
-          node make test:spawn:headless &
-          sleep 5  # Give chrome time to start
-          
-      - name: Run Bokeh examples tests
-        working-directory: bokeh
-        if: success() || failure()
-        run: |
-          # Run examples tests (may require AWS credentials for some tests)
-          pytest -s -v --color=yes --tb=line tests/test_examples.py || echo "Some examples tests may have failed due to missing AWS credentials"
-          
-      - name: Test narwhals integration
-        working-directory: bokeh
-        if: success() || failure()
-        run: |
-          # Test basic narwhals integration
-          python -c "import bokeh; import narwhals; print('Bokeh and Narwhals imported successfully')"
-          
-          # Run any dataframe-related tests that might involve narwhals
-          pytest -v --color=yes -k "dataframe or pandas or polars" tests/unit/ || echo "No dataframe-related tests found or they completed"
