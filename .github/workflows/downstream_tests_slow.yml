@@ -178,6 +178,7 @@ jobs:
           pip freeze
           pip uninstall -y narwhals
           pip install -e .
+          pip freeze
           
       - name: Ensure Python version
         run: |
